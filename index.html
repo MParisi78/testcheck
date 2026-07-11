@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cherokee CoPilot">
+<meta name="theme-color" content="#0a0f1a">
+<title>Cherokee 140 CoPilot</title>
+<style>
+:root {
+  --bg: #0a0f1a;
+  --panel: #0f172a;
+  --panel-2: #131c30;
+  --border: #1e293b;
+  --text: #e8ecf2;
+  --text-dim: #94a3b8;
+  --muted: #64748b;
+  --ok: #4ade80;
+  --caution: #fbbf24;
+  --warn: #ef4444;
+  --data: #22d3ee;
+  --accent: #a5b4fc;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  overflow: hidden; overscroll-behavior: none;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  user-select: none; -webkit-user-select: none;
+}
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+button { font-family: inherit; }
+
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* ---------- Setup ---------- */
+#setup { padding: 20px; overflow-y: auto; display: none; }
+#setup.active { display: flex; }
+#setup h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.5px; }
+#setup h1 span { color: var(--data); }
+#setup .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%; padding: 12px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 15px;
+  font-family: inherit;
+}
+.row { display: flex; gap: 10px; }
+.row .field { flex: 1; }
+.btn {
+  display: block; width: 100%; padding: 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  font-size: 15px; font-weight: 500; margin-top: 10px; cursor: pointer;
+}
+.btn.primary { background: var(--data); color: #001; border-color: var(--data); font-weight: 600; }
+.btn.ghost { background: transparent; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+/* ---------- Cockpit ---------- */
+#cockpit { display: none; }
+#cockpit.active { display: grid; }
+#cockpit {
+  grid-template-columns: 1.1fr 1.3fr 0.9fr;
+  grid-template-rows: auto 1fr;
+  gap: 8px; padding: 8px; height: 100%;
+  grid-template-areas:
+    "top    top    top"
+    "left   center right";
+}
+@media (max-width: 900px) {
+  #cockpit {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas: "top" "left" "center" "right";
+    overflow-y: auto;
+  }
+}
+
+.topbar { grid-area: top; display: flex; align-items: center; gap: 8px; padding: 6px 4px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.status-dot.demo { background: var(--caution); }
+.status-text { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); }
+.spacer { flex: 1; }
+.icon-btn {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 8px; font-size: 12px; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px; overflow: hidden; display: flex; flex-direction: column;
+}
+.panel-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--muted); margin-bottom: 8px; font-weight: 600;
+}
+
+/* Left panel: Primary flight data */
+.left { grid-area: left; }
+.pfd-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.pfd-cell { flex: 1; background: var(--panel-2); border-radius: 8px; padding: 10px; text-align: center; }
+.pfd-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.pfd-value { font-size: 28px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.pfd-value.big { font-size: 34px; }
+.pfd-unit { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
+
+.phase-badge {
+  padding: 8px 12px; border-radius: 8px; background: var(--panel-2);
+  text-align: center; margin-top: 4px;
+}
+.phase-badge .p-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+.phase-badge .p-value { font-size: 16px; font-weight: 600; color: var(--data); margin-top: 2px; letter-spacing: 1px; }
+
+.stall-bar {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+  background: var(--panel-2); font-size: 12px;
+}
+.stall-bar.warn { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--warn); }
+.stall-bar .val { color: var(--data); font-weight: 600; }
+
+/* Center panel: Airports + Airspace */
+.center { grid-area: center; gap: 8px; }
+.section { margin-bottom: 10px; }
+.dest-card {
+  background: var(--panel-2); border-radius: 10px; padding: 12px;
+  margin-bottom: 8px; border: 1px solid var(--border);
+}
+.dest-header { display: flex; align-items: baseline; justify-content: space-between; }
+.dest-id { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.dest-name { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.dest-dist { font-size: 26px; font-weight: 600; color: var(--data); }
+.dest-dist-unit { font-size: 11px; color: var(--text-dim); }
+.dest-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.info-cell { }
+.info-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+.info-value { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+.airspace-stack {
+  background: var(--panel-2); border-radius: 10px; padding: 12px;
+}
+.airspace-row {
+  display: grid; grid-template-columns: 60px 1fr auto auto; gap: 10px;
+  align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.airspace-row:last-child { border-bottom: none; }
+.airspace-class {
+  font-weight: 800; text-align: center; padding: 4px 6px;
+  border-radius: 6px; font-size: 13px;
+}
+.airspace-class.B { background: rgba(34, 211, 238, 0.15); color: var(--data); border: 1px solid var(--data); }
+.airspace-class.C { background: rgba(165, 180, 252, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+.airspace-class.D { background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid #60a5fa; }
+.airspace-name { font-size: 12px; color: var(--text-dim); }
+.airspace-alt { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text); }
+.airspace-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.airspace-status.clear { background: rgba(74, 222, 128, 0.15); color: var(--ok); }
+.airspace-status.caution { background: rgba(251, 191, 36, 0.15); color: var(--caution); }
+.airspace-status.warn { background: rgba(239, 68, 68, 0.2); color: var(--warn); }
+.airspace-empty { text-align: center; color: var(--muted); font-size: 12px; padding: 12px; }
+
+/* Right panel: Fuel + Callouts */
+.right { grid-area: right; gap: 8px; }
+.fuel-card { background: var(--panel-2); border-radius: 10px; padding: 12px; }
+.fuel-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.fuel-tank { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.fuel-tank.LEFT { color: var(--ok); }
+.fuel-tank.RIGHT { color: var(--data); }
+.fuel-timer { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 600; }
+.fuel-timer.caution { color: var(--caution); }
+.fuel-timer.warn { color: var(--warn); }
+.progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--ok); transition: width 0.3s; border-radius: 3px; }
+.progress-bar.caution { background: var(--caution); }
+.progress-bar.warn { background: var(--warn); }
+.fuel-actions { display: flex; gap: 6px; margin-top: 10px; }
+.fuel-btn {
+  flex: 1; padding: 8px; border-radius: 6px; background: var(--panel);
+  border: 1px solid var(--border); color: var(--text); font-size: 12px;
+  cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+}
+.fuel-btn.primary { background: var(--data); color: #001; border-color: var(--data); font-weight: 700; }
+
+.callouts { flex: 1; overflow-y: auto; }
+.callout {
+  padding: 8px 10px; border-radius: 6px; background: var(--panel-2);
+  margin-bottom: 6px; font-size: 12px; line-height: 1.4;
+  border-left: 3px solid var(--muted);
+}
+.callout.info { border-left-color: var(--data); }
+.callout.caution { border-left-color: var(--caution); background: rgba(251, 191, 36, 0.08); }
+.callout.warn { border-left-color: var(--warn); background: rgba(239, 68, 68, 0.08); }
+.callout .t { font-size: 10px; color: var(--muted); font-family: ui-monospace, monospace; }
+.callout .m { color: var(--text); margin-top: 2px; }
+
+/* Bottom action bar */
+.actions-row { display: flex; gap: 6px; margin-top: 8px; }
+.action-btn {
+  flex: 1; padding: 10px 4px; border-radius: 8px; background: var(--panel-2);
+  border: 1px solid var(--border); color: var(--text); font-size: 11px;
+  cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+}
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 10; align-items: flex-end; justify-content: center; padding: 20px; }
+.modal.active { display: flex; }
+.modal-content { background: var(--panel); border-radius: 16px; padding: 20px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border); }
+.modal h2 { font-size: 18px; margin: 0 0 12px; }
+.modal .close { background: transparent; border: none; color: var(--text-dim); font-size: 24px; float: right; cursor: pointer; }
+
+.poh-answer { background: var(--panel-2); padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.poh-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+/* Mic button — big, tappable in flight, obvious when hot */
+.mic-row { display: flex; gap: 10px; align-items: stretch; margin-top: 12px; }
+.mic-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; border-radius: 10px;
+  background: var(--data); color: #001;
+  border: 1px solid var(--data); font-weight: 700;
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; min-width: 140px; justify-content: center;
+  transition: background 0.15s, transform 0.05s;
+  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+}
+.mic-btn:active { transform: scale(0.97); }
+.mic-btn.live {
+  background: var(--warn); border-color: var(--warn); color: #fff;
+  animation: mic-pulse 1s infinite;
+}
+.mic-btn.disabled { background: var(--panel-2); color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50%      { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
+.mic-status {
+  margin-top: 8px; padding: 8px 12px; border-radius: 8px;
+  background: var(--panel-2); color: var(--text-dim); font-size: 12px;
+  min-height: 20px; font-style: italic; display: none;
+}
+.mic-status.active { display: block; }
+.poh-quick-btn {
+  padding: 6px 10px; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 16px; color: var(--text); font-size: 11px; cursor: pointer;
+}
+
+.warn-banner {
+  background: rgba(239, 68, 68, 0.2); border: 1px solid var(--warn);
+  color: var(--warn); padding: 10px 12px; border-radius: 8px;
+  margin-bottom: 8px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<div id="setup" class="screen active">
+  <h1>Cherokee <span>140</span> CoPilot</h1>
+  <div class="sub">Your talking sidekick for the pattern, the enroute, and the airspace.</div>
+
+  <div class="field">
+    <label>Tail Number</label>
+    <input id="tail" type="text" placeholder="N12345" autocapitalize="characters">
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Speed Units</label>
+      <select id="units">
+        <option value="mph">MPH</option>
+        <option value="kts">KTS</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Fuel Switch (min)</label>
+      <input id="fuelInterval" type="number" value="30" min="10" max="60">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Stratux IP Address</label>
+    <input id="stratuxIp" type="text" value="192.168.10.1" placeholder="192.168.10.1">
+    <div class="hint">Default Stratux hotspot address. Connect to the Stratux WiFi first.</div>
+  </div>
+
+  <div class="field">
+    <label>Destination (optional — set later too)</label>
+    <select id="destSetup">
+      <option value="">— None —</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Voice</label>
+    <select id="voicePicker">
+      <option value="">Auto (best available)</option>
+    </select>
+    <div class="hint">
+      For the most natural-sounding voice: iPhone/iPad
+      <strong>Settings → Accessibility → Spoken Content → Voices → English</strong>,
+      and download <strong>Ava (Enhanced)</strong> or <strong>Evan (Enhanced)</strong>.
+      Those are neural voices — closest to a real person and they work offline.
+    </div>
+  </div>
+
+  <button class="btn primary" id="startLive">Connect to Stratux</button>
+  <button class="btn" id="startDemo">Run Demo Flight</button>
+
+  <div class="hint" style="margin-top: 20px;">
+    <strong>Before you fly with this:</strong> Cross-check every V-speed and fuel figure against your actual POH.
+    This is advisory only — not a replacement for looking outside, listening on the radio, or your own judgment.
+  </div>
+</div>
+
+<!-- ============ COCKPIT ============ -->
+<div id="cockpit" class="screen">
+  <div class="topbar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-text" id="statusText">DISCONNECTED</div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="pohBtn">POH</button>
+    <button class="icon-btn" id="destBtn">Dest</button>
+    <button class="icon-btn" id="quitBtn">Exit</button>
+  </div>
+
+  <!-- LEFT: Primary flight data -->
+  <div class="panel left">
+    <div class="panel-title">Primary Flight Data</div>
+    <div class="pfd-row">
+      <div class="pfd-cell">
+        <div class="pfd-label">Airspeed</div>
+        <div class="pfd-value big mono" id="iasVal">—</div>
+        <div class="pfd-unit" id="iasUnit">MPH</div>
+      </div>
+      <div class="pfd-cell">
+        <div class="pfd-label">Altitude</div>
+        <div class="pfd-value big mono" id="altVal">—</div>
+        <div class="pfd-unit">MSL</div>
+      </div>
+    </div>
+    <div class="pfd-row">
+      <div class="pfd-cell">
+        <div class="pfd-label">Heading</div>
+        <div class="pfd-value mono" id="hdgVal">—</div>
+      </div>
+      <div class="pfd-cell">
+        <div class="pfd-label">VSI</div>
+        <div class="pfd-value mono" id="vsiVal">—</div>
+        <div class="pfd-unit">FPM</div>
+      </div>
+      <div class="pfd-cell">
+        <div class="pfd-label">GS</div>
+        <div class="pfd-value mono" id="gsVal">—</div>
+      </div>
+    </div>
+    <div class="phase-badge">
+      <div class="p-label">Flight Phase</div>
+      <div class="p-value" id="phaseVal">STANDBY</div>
+    </div>
+    <div class="stall-bar" id="stallBar">
+      Stall (bank-adjusted): <span class="val mono" id="stallVal">—</span>
+    </div>
+  </div>
+
+  <!-- CENTER: Airports + Airspace -->
+  <div class="panel center">
+    <div class="panel-title">Destination</div>
+    <div id="destContainer">
+      <div class="airspace-empty">No destination set. Tap DEST to choose.</div>
+    </div>
+
+    <div class="panel-title" style="margin-top: 6px;">Nearest Airport</div>
+    <div id="nearestContainer">
+      <div class="airspace-empty">Awaiting position…</div>
+    </div>
+
+    <div class="panel-title" style="margin-top: 6px;">Airspace</div>
+    <div class="airspace-stack" id="airspaceContainer">
+      <div class="airspace-empty">No airspace within range.</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Fuel + Callouts -->
+  <div class="panel right">
+    <div class="panel-title">Fuel Tank</div>
+    <div class="fuel-card">
+      <div class="fuel-top">
+        <div class="fuel-tank" id="fuelTank">LEFT</div>
+        <div class="fuel-timer mono" id="fuelTimer">00:00</div>
+      </div>
+      <div class="progress"><div class="progress-bar" id="fuelProgress" style="width: 0%"></div></div>
+      <div class="fuel-actions">
+        <button class="fuel-btn primary" id="switchTankBtn">Switched Tanks</button>
+        <button class="fuel-btn" id="resetTimerBtn">Reset Timer</button>
+      </div>
+    </div>
+
+    <div class="panel-title" style="margin-top: 8px;">Callouts</div>
+    <div class="callouts" id="callouts"></div>
+  </div>
+</div>
+
+<!-- Destination modal -->
+<div class="modal" id="destModal">
+  <div class="modal-content">
+    <button class="close" onclick="closeModal('destModal')">×</button>
+    <h2>Set Destination</h2>
+    <input id="destSearch" type="text" placeholder="Search by ID or name" style="width:100%;padding:10px;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:14px;">
+    <div id="destList" style="margin-top: 12px; max-height: 400px; overflow-y: auto;"></div>
+  </div>
+</div>
+
+<!-- POH modal -->
+<!-- Mic permission help modal -->
+<div class="modal" id="micModal">
+  <div class="modal-content">
+    <button class="close" onclick="closeModal('micModal')">×</button>
+    <h2>Enable the microphone</h2>
+    <p id="micReasonText" style="color: var(--text-dim); font-size: 13px; margin: 0 0 12px;">
+      Safari needs your permission to use the microphone.
+    </p>
+    <div style="background: var(--panel-2); padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.7;">
+      <div style="font-weight: 700; color: var(--data); margin-bottom: 8px;">On iPhone / iPad:</div>
+      <div>1. Open the <strong>Settings</strong> app</div>
+      <div>2. Scroll down and tap <strong>Safari</strong></div>
+      <div>3. Under "Settings for Websites" tap <strong>Microphone</strong></div>
+      <div>4. Set to <strong>Allow</strong> (or find this site in the list and switch it on)</div>
+      <div>5. Come back here and tap the mic button again</div>
+    </div>
+    <div style="background: var(--panel-2); padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.7; margin-top: 10px;">
+      <div style="font-weight: 700; color: var(--data); margin-bottom: 8px;">If you added this to your Home Screen:</div>
+      <div>1. Open <strong>Settings → Apps → Cherokee CoPilot</strong> (or the app name you gave it)</div>
+      <div>2. Turn on <strong>Microphone</strong></div>
+    </div>
+    <button class="btn primary" style="margin-top: 16px;" onclick="tryMicAgain()">Try again</button>
+    <button class="btn" onclick="closeModal('micModal')">Use text instead</button>
+  </div>
+</div>
+
+<div class="modal" id="pohModal">
+  <div class="modal-content">
+    <button class="close" onclick="closeModal('pohModal')">×</button>
+    <h2>Cherokee 140 POH</h2>
+    <p style="color:var(--text-dim); font-size:12px; margin: 0 0 10px;">
+      Ask about V-speeds, engine failure, carb heat, fuel, weight &amp; balance, stall, takeoff, landing, cruise, electrical, flaps.
+    </p>
+
+    <div class="mic-row">
+      <input id="pohSearch" type="text" placeholder="Type your question…" autocomplete="off" autocorrect="off" style="flex:1;padding:12px;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:15px;">
+      <button class="mic-btn" id="micBtn" aria-label="Tap to ask by voice">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="pointer-events:none;">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+        </svg>
+        <span id="micLabel" style="pointer-events:none;">Voice</span>
+      </button>
+    </div>
+    <div class="mic-status" id="micStatus"></div>
+
+    <div class="poh-quick" id="pohQuick"></div>
+    <div class="poh-answer" id="pohAnswer">Type or tap a quick topic below to get started.</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   PIPER CHEROKEE 140 — REFERENCE DATA
+   ⚠️  VERIFY EVERY VALUE AGAINST YOUR ACTUAL POH BEFORE FLIGHT
+   ============================================================ */
+const CHEROKEE = {
+  vSpeeds_mph: {
+    Vs:  55,   // Stall clean, flaps up
+    Vso: 49,   // Stall dirty, full flaps
+    Vfe: 115,  // Max flap extension
+    Vno: 140,  // Max structural cruising
+    Vne: 171,  // Never exceed
+    Vx:  74,   // Best angle
+    Vy:  85,   // Best rate
+    Va:  129,  // Maneuvering @ gross
+    Vglide: 79,
+    downwind: 90,
+    base:     80,
+    finalApp: 75,
+    shortFinal: 65
+  },
+  fuel: {
+    tankGal: 25,       // main tanks — verify (some 140s have 17gal)
+    burnGph: 8.5,      // approx cruise
+    switchMin: 30      // default switch interval
+  }
+};
+
+/* ============================================================
+   AIRPORT DATABASE — Southeast Michigan sample
+   lat, lon in decimal degrees. elev in ft MSL.
+   ctaf in MHz. pattern is TPA in ft MSL (elev + 1000).
+   ============================================================ */
+const AIRPORTS = [
+  {id:'KPTK', name:'Oakland County Intl',   lat:42.6655, lon:-83.4204, elev: 980, ctaf:118.4,   pattern:1980, tower:true },
+  {id:'KYIP', name:'Willow Run',            lat:42.2379, lon:-83.5304, elev: 716, ctaf:120.15,  pattern:1716, tower:true },
+  {id:'KARB', name:'Ann Arbor Muni',        lat:42.2229, lon:-83.7456, elev: 839, ctaf:123.0,   pattern:1839, tower:false},
+  {id:'KFNT', name:'Bishop Intl (Flint)',   lat:42.9654, lon:-83.7435, elev: 782, ctaf:118.1,   pattern:1782, tower:true },
+  {id:'KOZW', name:'Livingston County',     lat:42.6294, lon:-83.9821, elev: 962, ctaf:122.7,   pattern:1962, tower:false},
+  {id:'KVLL', name:'Oakland/Troy',          lat:42.5450, lon:-83.1780, elev: 727, ctaf:122.725, pattern:1727, tower:false},
+  {id:'KDET', name:'Coleman A. Young Muni', lat:42.4093, lon:-83.0100, elev: 626, ctaf:118.65,  pattern:1626, tower:true },
+  {id:'KDTW', name:'Detroit Metro',         lat:42.2124, lon:-83.3534, elev: 645, ctaf:118.4,   pattern:1645, tower:true },
+  {id:'KHYX', name:'Saginaw H.W. Browne',   lat:43.4331, lon:-83.8621, elev: 663, ctaf:122.7,   pattern:1663, tower:false},
+  {id:'KRMY', name:'Brighton',              lat:42.5637, lon:-83.7871, elev: 995, ctaf:122.8,   pattern:1995, tower:false},
+  {id:'KLWA', name:'South Haven',           lat:42.3510, lon:-86.2564, elev: 666, ctaf:122.8,   pattern:1666, tower:false},
+  {id:'3BS',  name:'Bad Axe',               lat:43.7808, lon:-82.9856, elev: 762, ctaf:122.9,   pattern:1762, tower:false}
+];
+
+/* ============================================================
+   AIRPORT DATABASE — dynamic lookup
+   For airports not in the curated list above, we fetch the
+   OurAirports public dataset (hosted with CORS via GitHub Pages)
+   the first time it's needed, cache it in browser storage, and
+   look up any US public airport instantly after that.
+
+   Source: https://ourairports.com — CC0 public domain
+   ============================================================ */
+const AirportDB = {
+  DATA_URL: 'https://davidmegginson.github.io/ourairports-data/airports.csv',
+  FREQ_URL: 'https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv',
+  CACHE_KEY: 'cherokee_airportdb_v1',
+
+  index: null,      // ident -> record
+  loading: false,
+  loadPromise: null,
+  onProgress: null, // callback(msg)
+
+  async ensureIndex() {
+    if (this.index) return this.index;
+    if (this.loadPromise) return this.loadPromise;
+
+    // Try cache
+    try {
+      const cached = localStorage.getItem(this.CACHE_KEY);
+      if (cached) {
+        this.index = JSON.parse(cached);
+        return this.index;
+      }
+    } catch (e) { /* fall through to fetch */ }
+
+    // Fetch
+    this.loadPromise = this._download();
+    try {
+      this.index = await this.loadPromise;
+    } catch (e) {
+      this.loadPromise = null;
+      throw e;
+    }
+    return this.index;
+  },
+
+  async _download() {
+    this.loading = true;
+    const progress = (msg) => { if (this.onProgress) this.onProgress(msg); };
+    try {
+      progress('Downloading airport data…');
+      const [aRes, fRes] = await Promise.all([
+        fetch(this.DATA_URL),
+        fetch(this.FREQ_URL)
+      ]);
+      if (!aRes.ok || !fRes.ok) throw new Error('Failed to reach data source');
+      progress('Parsing airports…');
+      const aCsv = await aRes.text();
+      const fCsv = await fRes.text();
+      const idx = this._parseAirports(aCsv);
+      progress('Adding frequencies…');
+      this._parseFrequencies(fCsv, idx);
+      progress('Saving for offline use…');
+      try {
+        localStorage.setItem(this.CACHE_KEY, JSON.stringify(idx));
+      } catch (e) {
+        // Storage full — keep in memory for the session
+        console.warn('Airport DB too large for localStorage; kept in memory only.');
+      }
+      progress('Ready.');
+      return idx;
+    } finally {
+      this.loading = false;
+    }
+  },
+
+  _parseCSVLine(line) {
+    const cols = [];
+    let cur = '';
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        cols.push(cur); cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    cols.push(cur);
+    return cols;
+  },
+
+  _parseAirports(csv) {
+    const lines = csv.split('\n');
+    const headers = this._parseCSVLine(lines[0]);
+    const H = {
+      ident:    headers.indexOf('ident'),
+      type:     headers.indexOf('type'),
+      name:     headers.indexOf('name'),
+      lat:      headers.indexOf('latitude_deg'),
+      lon:      headers.indexOf('longitude_deg'),
+      elev:     headers.indexOf('elevation_ft'),
+      country:  headers.indexOf('iso_country'),
+      city:     headers.indexOf('municipality'),
+      local:    headers.indexOf('local_code'),
+      gps:      headers.indexOf('gps_code')
+    };
+    const OK_TYPES = new Set(['small_airport','medium_airport','large_airport','seaplane_base']);
+    const out = {};
+    for (let i = 1; i < lines.length; i++) {
+      const cols = this._parseCSVLine(lines[i]);
+      if (cols.length < headers.length) continue;
+      if (!OK_TYPES.has(cols[H.type])) continue;
+      // Scope to US to keep the cache size manageable — most Cherokee 140
+      // pilots don't do international runs. Easy to widen if needed.
+      if (cols[H.country] !== 'US') continue;
+
+      const ident = cols[H.ident];
+      const elev = parseInt(cols[H.elev]) || 0;
+      const record = {
+        id: ident,
+        name: cols[H.name],
+        lat: parseFloat(cols[H.lat]),
+        lon: parseFloat(cols[H.lon]),
+        elev: elev,
+        city: cols[H.city],
+        pattern: elev + 1000,
+        ctaf: null, tower: null, ground: null, atis: null, awos: null
+      };
+      out[ident] = record;
+      // Also index by local code (e.g. "PTK" resolves to record for "KPTK")
+      const local = cols[H.local];
+      const gps = cols[H.gps];
+      if (local && local !== ident && !out[local]) out[local] = record;
+      if (gps   && gps   !== ident && !out[gps])   out[gps]   = record;
+    }
+    return out;
+  },
+
+  _parseFrequencies(csv, index) {
+    const lines = csv.split('\n');
+    const headers = this._parseCSVLine(lines[0]);
+    const H = {
+      ident: headers.indexOf('airport_ident'),
+      type:  headers.indexOf('type'),
+      freq:  headers.indexOf('frequency_mhz')
+    };
+    for (let i = 1; i < lines.length; i++) {
+      const cols = this._parseCSVLine(lines[i]);
+      if (cols.length < 3) continue;
+      const rec = index[cols[H.ident]];
+      if (!rec) continue;
+      const type = (cols[H.type] || '').toUpperCase();
+      const freq = parseFloat(cols[H.freq]);
+      if (isNaN(freq) || freq < 108 || freq > 137) continue;
+
+      if      (type.includes('CTAF'))                              rec.ctaf = freq;
+      else if (type.includes('TWR') || type.includes('TOWER'))     rec.tower = freq;
+      else if (type.includes('GND') || type.includes('GROUND'))    rec.ground = freq;
+      else if (type.includes('ATIS'))                              rec.atis = freq;
+      else if (type.includes('AWOS') || type.includes('ASOS'))     rec.awos = freq;
+      else if (type.includes('UNIC'))                              rec.ctaf = rec.ctaf || freq;
+    }
+    // Fall back for airports with no explicit CTAF: use tower freq, else 122.8 (US uncontrolled default)
+    for (const key in index) {
+      const r = index[key];
+      if (!r.ctaf) r.ctaf = r.tower || 122.8;
+    }
+  },
+
+  // Main entry point. Checks curated list first, then online DB.
+  async lookup(query) {
+    const q = query.toUpperCase().trim();
+    if (!q) return null;
+    const local = AIRPORTS.find(a => a.id === q);
+    if (local) return local;
+    // Try with 'K' prefix (US ICAO convention)
+    const localK = AIRPORTS.find(a => a.id === 'K' + q);
+    if (localK) return localK;
+
+    try {
+      const idx = await this.ensureIndex();
+      return idx[q] || idx['K' + q] || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Synchronous check — only returns hits from what's already loaded
+  peek(query) {
+    const q = query.toUpperCase().trim();
+    if (!q) return null;
+    const local = AIRPORTS.find(a => a.id === q);
+    if (local) return local;
+    if (this.index) return this.index[q] || this.index['K' + q] || null;
+    return null;
+  }
+};
+
+/* ============================================================
+   AIRSPACE — Simplified concentric rings (cylinders)
+   Real airspace is more complex; this is enough to keep you
+   from busting Class B/C floors around Detroit/Flint.
+   ============================================================ */
+const AIRSPACES = [
+  {
+    // NOTE: Simplified concentric model. Real KDTW Class B has directional
+    // shelves — verify against a current sectional before flight.
+    id:'DTW_B', name:'Detroit Class B', cls:'B',
+    rings: [
+      {c:{lat:42.2124,lon:-83.3534}, r: 7, floor:    0, ceiling: 10000},
+      {c:{lat:42.2124,lon:-83.3534}, r:15, floor: 4000, ceiling: 10000},
+      {c:{lat:42.2124,lon:-83.3534}, r:20, floor: 6000, ceiling: 10000},
+      {c:{lat:42.2124,lon:-83.3534}, r:30, floor: 8000, ceiling: 10000}
+    ]
+  },
+  {
+    id:'FNT_C', name:'Flint Class C', cls:'C',
+    rings: [
+      {c:{lat:42.9654,lon:-83.7435}, r: 5, floor:   0, ceiling: 4300},
+      {c:{lat:42.9654,lon:-83.7435}, r:10, floor:1800, ceiling: 4300}
+    ]
+  },
+  { id:'YIP_D', name:'Willow Run Class D',   cls:'D', rings:[{c:{lat:42.2379,lon:-83.5304}, r:5,   floor:0, ceiling:3300}] },
+  { id:'PTK_D', name:'Oakland Cty Class D',  cls:'D', rings:[{c:{lat:42.6655,lon:-83.4204}, r:4.3, floor:0, ceiling:3300}] },
+  { id:'ARB_D', name:'Ann Arbor Class D',    cls:'D', rings:[{c:{lat:42.2229,lon:-83.7456}, r:4.3, floor:0, ceiling:3300}] },
+  { id:'DET_D', name:'Detroit City Class D', cls:'D', rings:[{c:{lat:42.4093,lon:-83.0100}, r:4.3, floor:0, ceiling:2600}] }
+];
+
+/* ============================================================
+   POH KNOWLEDGE BASE — keyword indexed
+   ============================================================ */
+const POH_KB = [
+  { q:'engine failure engine out dead motor',
+    spoken:`For an engine out, first get to seventy-nine miles per hour — that's your best glide. Then switch fuel tanks, mixture rich, carb heat on, and check both mags. If it won't restart, pick a field, call MAYDAY on one twenty-one point five, and squawk seventy-seven hundred. Master and fuel off just before touchdown, and unlatch the door.`,
+    a:
+`Engine Failure in Flight (Cherokee 140):
+1. Airspeed — 79 MPH (best glide)
+2. Fuel selector — switch tank
+3. Mixture — RICH
+4. Carb heat — ON
+5. Primer — locked
+6. Magnetos — check both, try each
+7. If no restart: pick a field, MAYDAY on 121.5, squawk 7700
+8. Master OFF and fuel OFF before touchdown, unlatch door` },
+
+  { q:'carb heat carburetor ice icing',
+    spoken:`The Lycoming O three twenty is prone to carb ice, especially in humid air at low power. Use carb heat any time you pull the throttle back below cruise, or if you notice an RPM drop or rough running. Apply it before you reduce power. A small RPM drop when you pull it on is normal — that means it's working.`,
+    a:
+`Carburetor Ice: The Lycoming O-320 is prone to carb ice, especially in humid air at low power (descent, pattern).
+Use carb heat any time you reduce power below cruise, or if you suspect ice (RPM drop, rough running).
+Apply BEFORE reducing power. Expect small RPM drop when applied — that's normal, means it's working.` },
+
+  { q:'fuel tank switch selector management',
+    spoken:`The Cherokee has two main tanks, typically twenty-five gallons each — verify yours. Switch tanks at regular intervals, every thirty minutes is common, to keep the load balanced. Switch on the ground before takeoff to make sure both tanks feed. After you switch, check fuel pressure and listen for the engine. Never run a tank dry.`,
+    a:
+`Fuel Management: The Cherokee has two main tanks (typical 25 gal each — verify yours).
+Switch tanks at regular intervals (every 30 min is common) to keep load balanced.
+Switch on the ground before takeoff to confirm both tanks feed.
+After switching: check fuel pressure, listen for engine.
+Never run a tank dry — pump air into the lines.` },
+
+  { q:'weight balance cg gross',
+    spoken:`For a typical Cherokee one forty, empty weight around twelve seventy five, max gross twenty-one fifty, useful load about eight seventy five. CG range is narrow — heavy passengers in the back seat can push you aft, so run a real weight and balance for your actual load every flight.`,
+    a:
+`Weight & Balance (typical 140):
+Empty ~ 1275 lb, MTOW 2150 lb (2325 for later models — check TCDS).
+Max useful load ~ 875 lb.
+CG range narrow — heavy back-seat pax can push aft. Always run W&B for actual load.` },
+
+  { q:'stall spin recovery',
+    spoken:`Clean stall is fifty-five miles per hour. Dirty stall with full flaps, forty-nine. Stall speed goes up with bank — sixty degrees of bank doubles the load, stall around seventy-eight. To recover, reduce angle of attack — get the nose down — then full power, level the wings, and climb. Cherokee is docile but a cross-controlled stall in the pattern can spin you, so keep it coordinated.`,
+    a:
+`Stall Speeds (verify your POH):
+Vs (clean): 55 MPH
+Vso (dirty): 49 MPH
+Stall in a level 60° bank: Vs × sqrt(2) = ~78 MPH
+Recovery: reduce AoA (nose down), full power, level wings, then climb.
+Cherokee is docile, but a cross-controlled stall can spin — respect coordination in the pattern.` },
+
+  { q:'takeoff rotation departure',
+    spoken:`Normal takeoff, flaps up, rotate around sixty to sixty-five. Best angle Vx is seventy-four, best rate Vy is eighty-five. Short field, ten degrees of flaps, rotate around fifty-five, hold Vx until you're clear of obstacles. Retract flaps once you're safe.`,
+    a:
+`Normal Takeoff:
+Flaps: up (or 10° for short field)
+Rotate: 60-65 MPH
+Vx (best angle): 74 MPH
+Vy (best rate): 85 MPH
+Retract flaps at safe altitude.` },
+
+  { q:'landing approach pattern final',
+    spoken:`Pattern speeds. Downwind ninety with ten degrees of flaps abeam the numbers. Base eighty with twenty-five degrees. Final seventy-five with full flaps. Short final over the fence, sixty-five. If you need to go around, full power, carb heat off, flaps to twenty-five, get a positive climb, then finish retracting flaps.`,
+    a:
+`Landing Pattern:
+Downwind: 90 MPH, 10° flaps abeam the numbers
+Base: 80 MPH, 25° flaps
+Final: 75 MPH, full flaps
+Short final: 65 MPH over the fence
+Go-around: full power, carb heat off, flaps to 25°, positive climb, then retract.` },
+
+  { q:'cruise power mixture leaning',
+    spoken:`Cruise is typically twenty-three fifty to twenty-four fifty RPM at sixty-five to seventy-five percent power. Above three thousand feet density altitude, lean the mixture — pull it back until the engine roughens, then enrich just enough to smooth out. If you have an EGT, run fifty degrees rich of peak for cooler cylinders, or a hundred lean of peak for better economy.`,
+    a:
+`Cruise: Typical 2350-2450 RPM at 65-75% power.
+Lean mixture above 3000 ft DA — pull mixture until roughness, then enrich slightly.
+EGT peak is the reference; run 50° rich of peak for cool, 100° lean of peak for economy (if EGT installed).` },
+
+  { q:'electrical alternator battery volt amp',
+    spoken:`Fourteen volt system, sixty amp alternator, single battery. If the alternator fails you'll see the low volt light and the ammeter discharging. Shed nonessential loads — radios, lights, autopilot. Save the battery for landing lights and one comm on the approach, and land at the nearest suitable airport.`,
+    a:
+`Electrical: 14V system, 60A alternator, single battery.
+If alternator fails (low volt light, ammeter discharging):
+1. Turn off nonessential loads (radios, lights, autopilot)
+2. Keep battery for landing lights + one comm for approach
+3. Land at nearest suitable airport` },
+
+  { q:'flaps setting extension',
+    spoken:`Flap settings. Zero for cruise and initial climb. Ten degrees for short-field takeoff and downwind. Twenty-five on base. Forty, that's full, for short field final. Max flap extension speed Vfe is one fifteen — don't exceed that with any flaps out.`,
+    a:
+`Flap Settings:
+0°: cruise, initial climb
+10°: short-field takeoff, downwind
+25°: base leg
+40° (full): final for short field
+Vfe (max flap extension): 115 MPH — do not exceed with flaps down.` },
+
+  { q:'vspeeds v-speeds airspeeds numbers',
+    spoken:`The main V-speeds for the Cherokee one forty. Clean stall fifty-five, dirty stall forty-nine. Best angle Vx seventy-four, best rate Vy eighty-five. Best glide seventy-nine. Maneuvering Va one twenty-nine at gross weight. Max flap speed Vfe one fifteen. Max structural cruise Vno one forty. Never exceed Vne one seventy-one. All in miles per hour.`,
+    a:
+`Cherokee 140 V-Speeds (MPH — verify your POH):
+Vs (clean stall): 55
+Vso (dirty stall): 49
+Vx (best angle): 74
+Vy (best rate): 85
+Vglide (best glide): 79
+Va (maneuvering @ gross): 129
+Vfe (max flap): 115
+Vno (max structural cruise): 140
+Vne (never exceed): 171` }
+];
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const NM_PER_DEG_LAT = 60;
+
+function haversine(lat1, lon1, lat2, lon2) {
+  // Returns nautical miles
+  const R = 3440.065; // NM
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function bearing(lat1, lon1, lat2, lon2) {
+  const toRad = (d) => d * Math.PI / 180;
+  const y = Math.sin(toRad(lon2-lon1)) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2-lon1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function nmToSm(nm) { return nm * 1.15078; }
+function ktsToMph(kts) { return kts * 1.15078; }
+function fmtTime(sec) {
+  const m = Math.floor(Math.abs(sec) / 60);
+  const s = Math.floor(Math.abs(sec) % 60);
+  return (sec < 0 ? '-' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+/* ============================================================
+   VOICE ENGINE — picks the best sounding voice available on the
+   device. On iOS, "Enhanced" and "Premium" voices (downloaded via
+   Settings > Accessibility > Spoken Content > Voices) are neural
+   TTS and sound close to a real person. We prefer those.
+   ============================================================ */
+const VoiceEngine = {
+  chosen: null,
+  available: [],
+  userPref: null, // saved voice name
+
+  init() {
+    if (!('speechSynthesis' in window)) return;
+    const load = () => {
+      this.available = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+      this.chosen = this.selectBest();
+      if (window.onVoicesReady) window.onVoicesReady();
+    };
+    load();
+    speechSynthesis.onvoiceschanged = load;
+  },
+
+  selectBest() {
+    const v = this.available;
+    if (v.length === 0) return null;
+
+    // If user has an explicit preference, honor it
+    if (this.userPref) {
+      const match = v.find(x => x.name === this.userPref);
+      if (match) return match;
+    }
+
+    // Priority order — most natural first. iOS Ava/Evan/Zoe Enhanced are
+    // neural voices and by far the best available offline.
+    const patterns = [
+      /^Ava.*\(Enhanced\)/i,
+      /^Evan.*\(Enhanced\)/i,
+      /^Zoe.*\(Enhanced\)/i,
+      /^Ava.*\(Premium\)/i,
+      /^Evan.*\(Premium\)/i,
+      /Neural/i,
+      /Enhanced/i,
+      /Premium/i,
+      /^Samantha/i,       // iOS default — decent but robotic
+      /^Karen/i,
+      /^Daniel/i,
+      /Google.*US/i
+    ];
+    for (const p of patterns) {
+      const match = v.find(x => p.test(x.name));
+      if (match) return match;
+    }
+    return v[0];
+  },
+
+  setPreference(name) {
+    this.userPref = name;
+    this.chosen = this.selectBest();
+    try { localStorage.setItem('cherokee_voice', name); } catch(e){}
+  },
+
+  loadPreference() {
+    try {
+      const saved = localStorage.getItem('cherokee_voice');
+      if (saved) this.userPref = saved;
+    } catch(e){}
+  }
+};
+
+/* ============================================================
+   SPEECH RECOGNITION — tap the mic in the POH panel to ask
+   questions out loud. Auto-stops when you finish speaking.
+   ============================================================ */
+const Listener = {
+  rec: null,
+  listening: false,
+  micGranted: false, // true once we've successfully requested audio access
+
+  supported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  },
+
+  init(onTranscript) {
+    if (!this.supported()) return false;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.rec = new SR();
+    this.rec.lang = 'en-US';
+    this.rec.continuous = false;
+    this.rec.interimResults = true;
+    this.rec.maxAlternatives = 1;
+    this.onTranscript = onTranscript;
+
+    this.rec.onresult = (e) => {
+      let final = '';
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (interim && this.onInterim) this.onInterim(interim);
+      if (final && this.onTranscript) this.onTranscript(final.trim());
+    };
+    this.rec.onend = () => {
+      this.listening = false;
+      if (this.onStateChange) this.onStateChange(false);
+    };
+    this.rec.onerror = (e) => {
+      this.listening = false;
+      // "not-allowed" / "service-not-allowed" are permission problems
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        this.micGranted = false;
+        if (this.onPermissionDenied) this.onPermissionDenied(e.error);
+      } else if (this.onStateChange) {
+        this.onStateChange(false, e.error);
+      }
+    };
+    return true;
+  },
+
+  // Proactively request mic access. iOS shows the permission prompt reliably
+  // when we call getUserMedia from a user gesture — more reliably than
+  // starting SpeechRecognition cold.
+  async requestMic() {
+    if (this.micGranted) return { granted: true };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return { granted: false, reason: 'no-api' };
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Immediately release the stream — we only wanted the permission
+      stream.getTracks().forEach(t => t.stop());
+      this.micGranted = true;
+      return { granted: true };
+    } catch (e) {
+      // NotAllowedError = user denied or previously denied
+      // NotFoundError = no mic hardware
+      return { granted: false, reason: e.name || 'unknown', message: e.message };
+    }
+  },
+
+  async start() {
+    if (!this.rec || this.listening) return { started: false };
+    // Ensure mic access first for a cleaner error path
+    const perm = await this.requestMic();
+    if (!perm.granted) {
+      if (this.onPermissionDenied) this.onPermissionDenied(perm.reason);
+      return { started: false, reason: perm.reason };
+    }
+    try {
+      this.rec.start();
+      this.listening = true;
+      if (this.onStateChange) this.onStateChange(true);
+      return { started: true };
+    } catch (e) {
+      return { started: false, reason: e.name };
+    }
+  },
+
+  stop() {
+    if (this.rec && this.listening) {
+      this.rec.stop();
+    }
+  }
+};
+
+function speak(text, { priority = 'normal' } = {}) {
+  logCallout(text);
+  if (!('speechSynthesis' in window)) return;
+  if (priority === 'urgent') speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  if (VoiceEngine.chosen) u.voice = VoiceEngine.chosen;
+  // Neural voices sound best at natural pace; robotic voices benefit from a hair slower
+  const isNeural = VoiceEngine.chosen &&
+                   /Enhanced|Premium|Neural/i.test(VoiceEngine.chosen.name);
+  u.rate = isNeural ? 1.0 : 0.95;
+  u.pitch = 1.0;
+  u.volume = 1.0;
+  speechSynthesis.speak(u);
+}
+function logCallout(text, level='info') {
+  state.calloutLog.unshift({ time: new Date(), text, level });
+  if (state.calloutLog.length > 30) state.calloutLog.pop();
+  renderCallouts();
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  connected: false,
+  demoMode: false,
+  demoStart: 0,
+
+  ahrs: {
+    lat:null, lon:null,
+    altMSL:0, gsKts:0, ias:0, hdg:0, trk:0, vsFpm:0, bank:0, pitch:0
+  },
+
+  units: 'mph',
+  fuelInterval: 30,
+  tail: '',
+
+  phase: 'standby',
+  destination: null,
+  nearest: null,
+
+  fuelTank: 'LEFT',
+  fuelStart: Date.now(),
+
+  activeAirspaces: [],
+  airspaceStates: {}, // id -> last state, for edge detection
+
+  said: new Set(),
+
+  calloutLog: [],
+  ws: null,
+  wsRetry: null
+};
+
+/* ============================================================
+   PHASE DETECTION
+   ============================================================ */
+function detectPhase() {
+  const a = state.ahrs;
+  const nearest = state.nearest;
+  const nearElev = nearest ? nearest.airport.elev : 0;
+  const altAGL = a.altMSL - nearElev;
+  const distToDest = state.destination ? state.destination.distance : Infinity;
+
+  if (a.gsKts < 3 && Math.abs(a.vsFpm) < 100) return 'ground';
+  if (a.gsKts < 35 && altAGL < 50) return 'taxi';
+  if (a.gsKts >= 35 && altAGL < 200 && a.vsFpm < 200) return 'takeoff';
+
+  // Pattern detection: near destination, low altitude
+  if (state.destination && distToDest < 4 && altAGL < 1500) {
+    return 'pattern';
+  }
+
+  if (a.vsFpm > 300 && altAGL < 3000) return 'climb';
+  if (a.vsFpm < -300 && distToDest < 15) return 'descent';
+  if (Math.abs(a.vsFpm) < 300) return 'cruise';
+  if (a.vsFpm > 300) return 'climb';
+  if (a.vsFpm < -300) return 'descent';
+  return 'cruise';
+}
+
+function onPhaseChange(oldPhase, newPhase) {
+  const V = CHEROKEE.vSpeeds_mph;
+  switch (newPhase) {
+    case 'takeoff':
+      speak(`Takeoff roll. Rotate 60 to 65. V Y 85.`);
+      break;
+    case 'climb':
+      if (oldPhase === 'takeoff') speak(`Climbing. Vy 85. Flaps up when safe.`);
+      else speak(`Climbing. Target Vy 85.`);
+      break;
+    case 'cruise':
+      if (oldPhase === 'climb') speak(`Level off. Set cruise power, lean the mixture, check the gauges.`);
+      break;
+    case 'descent':
+      speak(`Descending. Consider carb heat. Watch for traffic below.`);
+      break;
+    case 'pattern':
+      if (state.destination) {
+        const apt = state.destination.airport;
+        speak(`Entering the pattern at ${apt.id}. Pattern altitude ${apt.pattern}. Target downwind ${V.downwind}.`);
+      }
+      break;
+  }
+}
+
+/* ============================================================
+   DESTINATION DISTANCE CALLOUTS
+   ============================================================ */
+const DEST_MILESTONES = [
+  { d: 25, key: 'd25', build: (a) => `${a.id} 25 miles. Field elevation ${a.elev}. Time to start thinking descent.` },
+  { d: 15, key: 'd15', build: (a) => `${a.id} 15 miles. CTAF ${a.ctaf.toFixed(2)}. Pattern altitude ${a.pattern}.` },
+  { d: 10, key: 'd10', build: (a) => `${a.id} 10 miles. Make your first traffic call on ${a.ctaf.toFixed(2)}.` },
+  { d:  5, key: 'd05', build: (a) => `${a.id} 5 miles. Second call. Set up for pattern entry.` },
+  { d:  3, key: 'd03', build: (a) => `${a.id} 3 miles. Announce entering the pattern.` },
+  { d:  1, key: 'd01', build: (a) => `${a.id} 1 mile. Final position call.` }
+];
+
+function checkDestinationCallouts() {
+  if (!state.destination) return;
+  // Milestones are in statute miles (matches display + Cherokee MPH convention)
+  const distSm = nmToSm(state.destination.distance);
+  const apt = state.destination.airport;
+  for (const m of DEST_MILESTONES) {
+    const key = `dest_${apt.id}_${m.key}`;
+    if (distSm <= m.d && distSm > m.d - 0.9 && !state.said.has(key)) {
+      state.said.add(key);
+      speak(m.build(apt));
+    }
+  }
+}
+
+/* ============================================================
+   AIRSPACE PROXIMITY
+   Two kinds of warnings:
+   1. Vertical: laterally inside a ring, altitude within 500ft of
+      floor from below → warn.
+   2. Lateral: outside laterally, within 5 nm of ring boundary, on
+      a heading toward the ring, AT an altitude that would put you
+      inside → warn.
+   ============================================================ */
+function angleDelta(a, b) {
+  let d = ((a - b + 540) % 360) - 180;
+  return d;
+}
+
+function checkAirspaces() {
+  const a = state.ahrs;
+  if (a.lat == null || a.lon == null) return;
+
+  // Use ground track if available, else heading. If we're barely moving,
+  // don't apply lateral-approach logic (parked on a ramp).
+  const heading = a.trk || a.hdg || 0;
+  const moving = (a.gsKts || 0) > 20;
+
+  const active = [];
+  for (const as of AIRSPACES) {
+    let bestRing = null;
+    let bestStatus = null;
+    let bestClearance = null;
+
+    for (const ring of as.rings) {
+      const dist = haversine(a.lat, a.lon, ring.c.lat, ring.c.lon);
+      if (dist > ring.r + 10) continue; // way out
+
+      let status, clearance;
+      if (dist <= ring.r) {
+        // Laterally inside this ring
+        if (a.altMSL >= ring.floor && a.altMSL <= ring.ceiling) {
+          status = 'inside';
+          clearance = 0;
+        } else if (a.altMSL < ring.floor) {
+          clearance = ring.floor - a.altMSL;
+          // Tighter threshold: warn at 500 ft, not 1000
+          status = clearance <= 500 ? 'below-warn' : 'below-safe';
+        } else {
+          status = 'above';
+          clearance = a.altMSL - ring.ceiling;
+        }
+      } else {
+        // Outside laterally. Is it in front of us at penetrating altitude?
+        clearance = dist - ring.r; // nm to boundary
+        status = 'outside';
+        if (moving && clearance <= 5 &&
+            a.altMSL >= ring.floor && a.altMSL <= ring.ceiling) {
+          const bearingTo = bearing(a.lat, a.lon, ring.c.lat, ring.c.lon);
+          const delta = Math.abs(angleDelta(heading, bearingTo));
+          // Track is within 45° of the ring center means we're heading in
+          if (delta < 45) status = 'approaching';
+        }
+      }
+
+      // Prefer the most severe ring status
+      if (!bestRing || rankSeverity(status) > rankSeverity(bestStatus)) {
+        bestRing = ring;
+        bestStatus = status;
+        bestClearance = clearance;
+      }
+    }
+
+    if (bestRing) {
+      active.push({
+        id: as.id, name: as.name, cls: as.cls,
+        ring: bestRing, status: bestStatus, clearance: bestClearance
+      });
+    }
+  }
+
+  state.activeAirspaces = active;
+
+  // Edge-triggered voice callouts
+  for (const as of active) {
+    const prev = state.airspaceStates[as.id];
+    if (as.status === 'inside' && prev !== 'inside') {
+      speak(`Alert. You are inside ${as.name}. Ceiling ${as.ring.ceiling}, floor ${as.ring.floor}.`, { priority: 'urgent' });
+    } else if (as.status === 'below-warn' && prev !== 'below-warn') {
+      speak(`Caution. ${as.name} floor at ${as.ring.floor}. You are ${Math.round(as.clearance)} feet below.`);
+    } else if (as.status === 'approaching' && prev !== 'approaching') {
+      speak(`Heads up. ${as.name} ahead, ${as.clearance.toFixed(1)} miles. At your altitude that's a bust — climb, descend, or turn.`);
+    }
+    state.airspaceStates[as.id] = as.status;
+  }
+  // Clear old states
+  for (const id in state.airspaceStates) {
+    if (!active.find(a => a.id === id)) delete state.airspaceStates[id];
+  }
+}
+function rankSeverity(s) {
+  return {'inside':5,'approaching':4,'below-warn':3,'above':2,'below-safe':1,'outside':0}[s] || 0;
+}
+
+/* ============================================================
+   PATTERN LEG CALLOUTS
+   ============================================================ */
+let lastPatternCall = 0;
+function checkPatternCallouts() {
+  if (state.phase !== 'pattern') return;
+  const V = CHEROKEE.vSpeeds_mph;
+  const a = state.ahrs;
+  const now = Date.now();
+  if (now - lastPatternCall < 20000) return;
+
+  // Very simplified leg inference by altitude AGL relative to pattern
+  const apt = state.destination?.airport;
+  if (!apt) return;
+  const altAboveField = a.altMSL - apt.elev;
+
+  if (altAboveField > 800 && a.ias > V.base + 5) {
+    speak(`Downwind. Target ${V.downwind}. Ten degrees of flaps abeam the numbers.`);
+    lastPatternCall = now;
+  } else if (altAboveField > 400 && altAboveField <= 800) {
+    speak(`Base leg. Target ${V.base}. Twenty five degrees of flaps.`);
+    lastPatternCall = now;
+  } else if (altAboveField <= 400) {
+    speak(`Final. Target ${V.finalApp}. Full flaps. Short final ${V.shortFinal}.`);
+    lastPatternCall = now;
+  }
+}
+
+/* ============================================================
+   STALL WARNING (bank-adjusted)
+   ============================================================ */
+function computeStallSpeed() {
+  const Vs = CHEROKEE.vSpeeds_mph.Vs;
+  const bankRad = (state.ahrs.bank || 0) * Math.PI / 180;
+  const cos = Math.cos(bankRad);
+  if (cos <= 0.1) return Vs * 3.2; // ridiculous bank, cap
+  return Vs / Math.sqrt(cos);
+}
+
+/* ============================================================
+   FUEL TIMER
+   ============================================================ */
+function updateFuelTimer() {
+  const now = Date.now();
+  const elapsedMs = now - state.fuelStart;
+  const elapsedMin = elapsedMs / 60000;
+  const intervalMin = state.fuelInterval;
+  const remainingMin = intervalMin - elapsedMin;
+
+  $('fuelTimer').textContent = fmtTime((intervalMin - elapsedMin) * 60);
+  const bar = $('fuelProgress');
+  const pct = Math.max(0, Math.min(100, (elapsedMin / intervalMin) * 100));
+  bar.style.width = pct + '%';
+
+  if (remainingMin <= 0) {
+    bar.className = 'progress-bar warn';
+    $('fuelTimer').className = 'fuel-timer mono warn';
+    if (!state.said.has('fuel_over')) {
+      state.said.add('fuel_over');
+      speak(`Fuel switch overdue. Switch tanks now. Currently on ${state.fuelTank} tank.`);
+    }
+  } else if (remainingMin <= 5) {
+    bar.className = 'progress-bar caution';
+    $('fuelTimer').className = 'fuel-timer mono caution';
+    if (!state.said.has('fuel_5')) {
+      state.said.add('fuel_5');
+      speak(`Five minutes to fuel tank switch. Currently on ${state.fuelTank}.`);
+    }
+  } else {
+    bar.className = 'progress-bar';
+    $('fuelTimer').className = 'fuel-timer mono';
+  }
+}
+function switchTank() {
+  state.fuelTank = state.fuelTank === 'LEFT' ? 'RIGHT' : 'LEFT';
+  state.fuelStart = Date.now();
+  state.said.delete('fuel_over');
+  state.said.delete('fuel_5');
+  $('fuelTank').textContent = state.fuelTank;
+  $('fuelTank').className = 'fuel-tank ' + state.fuelTank;
+  speak(`Switched to ${state.fuelTank} tank. Verify fuel pressure and listen for engine.`);
+}
+
+/* ============================================================
+   NEAREST + DESTINATION
+   ============================================================ */
+function updateNearest() {
+  if (state.ahrs.lat == null) return;
+  let best = null, bestD = Infinity;
+  for (const a of AIRPORTS) {
+    const d = haversine(state.ahrs.lat, state.ahrs.lon, a.lat, a.lon);
+    if (d < bestD) { bestD = d; best = a; }
+  }
+  state.nearest = { airport: best, distance: bestD };
+}
+function updateDestination() {
+  if (!state.destination || state.ahrs.lat == null) return;
+  const a = state.destination.airport;
+  state.destination.distance = haversine(state.ahrs.lat, state.ahrs.lon, a.lat, a.lon);
+  state.destination.bearing  = bearing(state.ahrs.lat, state.ahrs.lon, a.lat, a.lon);
+}
+function setDestination(apt) {
+  state.destination = { airport: apt, distance: 0, bearing: 0 };
+  // Clear old callouts so they can re-fire for the new destination
+  for (const key of Array.from(state.said)) {
+    if (key.startsWith('dest_')) state.said.delete(key);
+  }
+  updateDestination();
+  speak(`Destination set: ${apt.id}. ${apt.name}. Field elevation ${apt.elev}. CTAF ${apt.ctaf.toFixed(2)}.`);
+  renderDestination();
+}
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+function renderPFD() {
+  const a = state.ahrs;
+  const iasDisplay = state.units === 'mph' ? Math.round(a.ias) : Math.round(a.ias / 1.15078);
+  $('iasVal').textContent = a.ias > 0 ? iasDisplay : '—';
+  $('iasUnit').textContent = state.units.toUpperCase();
+  $('altVal').textContent = a.altMSL > 0 ? Math.round(a.altMSL).toLocaleString() : '—';
+  $('hdgVal').textContent = a.hdg > 0 ? String(Math.round(a.hdg)).padStart(3,'0') + '°' : '—';
+  $('vsiVal').textContent = a.vsFpm !== 0 ? (a.vsFpm > 0 ? '+' : '') + Math.round(a.vsFpm) : '0';
+  const gsDisp = state.units === 'mph' ? Math.round(ktsToMph(a.gsKts)) : Math.round(a.gsKts);
+  $('gsVal').textContent = a.gsKts > 0 ? gsDisp : '—';
+  $('phaseVal').textContent = state.phase.toUpperCase().replace('_', ' ');
+
+  const stall = computeStallSpeed(); // MPH, matches internal IAS
+  const iasMph = a.ias; // always stored internally as MPH
+  const stallDisplay = state.units === 'mph' ? Math.round(stall) : Math.round(stall / 1.15078);
+  $('stallVal').textContent = stallDisplay + ' ' + state.units.toUpperCase();
+  const bar = $('stallBar');
+  if (iasMph > 0 && iasMph < stall * 1.2 && a.altMSL > (state.nearest?.airport?.elev || 0) + 100) {
+    bar.classList.add('warn');
+    if (iasMph < stall * 1.15 && !state.said.has('stall_' + Math.floor(Date.now()/10000))) {
+      state.said.add('stall_' + Math.floor(Date.now()/10000));
+      speak(`Airspeed. ${Math.round(iasMph)}. Stall speed ${Math.round(stall)}.`);
+    }
+  } else {
+    bar.classList.remove('warn');
+  }
+}
+
+function renderDestination() {
+  const c = $('destContainer');
+  if (!state.destination) {
+    c.innerHTML = '<div class="airspace-empty">No destination set. Tap DEST to choose.</div>';
+    return;
+  }
+  const d = state.destination;
+  const a = d.airport;
+  const distSm = nmToSm(d.distance).toFixed(1);
+  c.innerHTML = `
+    <div class="dest-card">
+      <div class="dest-header">
+        <div>
+          <div class="dest-id">${a.id}</div>
+          <div class="dest-name">${a.name}</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="dest-dist mono">${distSm}</div>
+          <div class="dest-dist-unit">SM · BRG ${String(Math.round(d.bearing)).padStart(3,'0')}°</div>
+        </div>
+      </div>
+      <div class="dest-info">
+        <div class="info-cell"><div class="info-label">Elev</div><div class="info-value mono">${a.elev}</div></div>
+        <div class="info-cell"><div class="info-label">TPA</div><div class="info-value mono">${a.pattern}</div></div>
+        <div class="info-cell"><div class="info-label">CTAF</div><div class="info-value mono">${a.ctaf.toFixed(2)}</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderNearest() {
+  const c = $('nearestContainer');
+  if (!state.nearest) {
+    c.innerHTML = '<div class="airspace-empty">Awaiting position…</div>';
+    return;
+  }
+  const n = state.nearest;
+  const distSm = nmToSm(n.distance).toFixed(1);
+  c.innerHTML = `
+    <div class="dest-card" style="padding: 10px;">
+      <div class="dest-header">
+        <div>
+          <div class="dest-id" style="font-size:18px;">${n.airport.id}</div>
+          <div class="dest-name">${n.airport.name}</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="dest-dist mono" style="font-size:20px;">${distSm}</div>
+          <div class="dest-dist-unit">SM</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAirspace() {
+  const c = $('airspaceContainer');
+  const active = state.activeAirspaces;
+
+  // Warning banner for any critical status
+  const warnings = active.filter(a =>
+    a.status === 'below-warn' || a.status === 'inside' || a.status === 'approaching');
+
+  if (active.length === 0) {
+    c.innerHTML = '<div class="airspace-empty">No airspace within range.</div>';
+    return;
+  }
+
+  let html = '';
+  if (warnings.length > 0) {
+    for (const w of warnings) {
+      if (w.status === 'inside') {
+        html += `<div class="warn-banner">⚠ INSIDE ${w.name}</div>`;
+      } else if (w.status === 'below-warn') {
+        html += `<div class="warn-banner">⚠ ${w.name} floor ${w.ring.floor}′ — you are ${Math.round(w.clearance)}′ below</div>`;
+      } else if (w.status === 'approaching') {
+        html += `<div class="warn-banner">⚠ ${w.name} ahead — ${w.clearance.toFixed(1)} nm, at your altitude</div>`;
+      }
+    }
+  }
+
+  for (const a of active) {
+    let statusClass = 'clear', statusText = 'Clear';
+    if (a.status === 'inside')          { statusClass = 'warn';    statusText = 'INSIDE'; }
+    else if (a.status === 'approaching'){ statusClass = 'warn';    statusText = `${a.clearance.toFixed(1)}nm ahead`; }
+    else if (a.status === 'below-warn') { statusClass = 'warn';    statusText = `-${Math.round(a.clearance)}′`; }
+    else if (a.status === 'below-safe') { statusClass = 'caution'; statusText = `-${Math.round(a.clearance)}′`; }
+    else if (a.status === 'above')      { statusClass = 'clear';   statusText = `+${Math.round(a.clearance)}′ above`; }
+    else if (a.status === 'outside')    { statusClass = 'clear';   statusText = `${a.clearance.toFixed(1)}nm out`; }
+
+    html += `
+      <div class="airspace-row">
+        <div class="airspace-class ${a.cls}">${a.cls}</div>
+        <div>
+          <div>${a.name}</div>
+          <div class="airspace-alt">${a.ring.floor}′ – ${a.ring.ceiling}′</div>
+        </div>
+        <div class="airspace-status ${statusClass}">${statusText}</div>
+      </div>`;
+  }
+  c.innerHTML = html;
+}
+
+function renderCallouts() {
+  const c = $('callouts');
+  if (!c) return;
+  c.innerHTML = state.calloutLog.map(item => {
+    const t = item.time;
+    const time = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0') + ':' + String(t.getSeconds()).padStart(2,'0');
+    return `<div class="callout ${item.level}"><div class="t">${time}</div><div class="m">${item.text}</div></div>`;
+  }).join('');
+}
+
+/* ============================================================
+   MAIN TICK (1 Hz)
+   ============================================================ */
+function tick() {
+  if (state.demoMode) demoTick();
+  updateNearest();
+  updateDestination();
+
+  const newPhase = detectPhase();
+  if (newPhase !== state.phase) {
+    onPhaseChange(state.phase, newPhase);
+    state.phase = newPhase;
+  }
+
+  checkDestinationCallouts();
+  checkAirspaces();
+  checkPatternCallouts();
+
+  renderPFD();
+  renderDestination();
+  renderNearest();
+  renderAirspace();
+  updateFuelTimer();
+}
+
+/* ============================================================
+   DEMO MODE
+   ============================================================ */
+// Waypoint script: {t (sec), lat, lon, altMSL, ias(mph), hdg, gsKts, vsFpm, bank}
+const DEMO_ROUTE = [
+  // Start at KPTK, taxi
+  { t:   0, lat:42.6655, lon:-83.4204, alt: 980, ias:  0, hdg:180, gs:  0, vs:    0, bank: 0 },
+  { t:   6, lat:42.6655, lon:-83.4204, alt: 980, ias:  0, hdg:180, gs:  8, vs:    0, bank: 0 },
+  // Takeoff roll
+  { t:  15, lat:42.6620, lon:-83.4204, alt: 980, ias: 65, hdg:180, gs: 55, vs:    0, bank: 0 },
+  // Climb southbound
+  { t:  30, lat:42.6300, lon:-83.4204, alt:2000, ias: 85, hdg:190, gs: 75, vs:  800, bank: 3 },
+  // Reach cruise 4500ft heading 200° — Class B 15nm shelf is dead ahead
+  { t:  50, lat:42.5400, lon:-83.4300, alt:4500, ias:110, hdg:200, gs: 95, vs:    0, bank: 0 },
+  // Level cruise — "approaching" warning fires around t=50-55 (in the 5nm
+  // approach cone at 4500ft, which is INSIDE Bravo's shelf altitude range)
+  { t:  60, lat:42.5050, lon:-83.4400, alt:4500, ias:110, hdg:200, gs: 95, vs:    0, bank: 0 },
+  // Pilot heeds the warning and descends. Rate ~2000 fpm — reaches 4000
+  // right before crossing the 15nm ring boundary, so no bust.
+  { t:  75, lat:42.4625, lon:-83.4550, alt:4000, ias:105, hdg:205, gs: 92, vs: -500, bank: 3 },
+  // Level at 3500 well inside the ring — 500ft below the floor.
+  // The tighter below-warn threshold catches this cleanly.
+  { t:  90, lat:42.4200, lon:-83.4700, alt:3500, ias:100, hdg:210, gs: 90, vs: -200, bank: 0 },
+  // Cruise under the shelf, continuing SW toward KYIP
+  { t: 110, lat:42.3500, lon:-83.4900, alt:3500, ias:105, hdg:215, gs: 92, vs:    0, bank: 0 },
+  { t: 130, lat:42.3200, lon:-83.5100, alt:3500, ias:105, hdg:220, gs: 92, vs:    0, bank: 0 },
+  // Descend for pattern
+  { t: 150, lat:42.3000, lon:-83.5300, alt:2500, ias:100, hdg:220, gs: 90, vs: -500, bank: 0 },
+  { t: 165, lat:42.2900, lon:-83.5300, alt:2200, ias: 95, hdg:220, gs: 87, vs: -300, bank: 0 },
+  { t: 180, lat:42.2750, lon:-83.5300, alt:2000, ias: 92, hdg:220, gs: 84, vs: -200, bank: 0 },
+  { t: 195, lat:42.2600, lon:-83.5300, alt:1800, ias: 90, hdg:220, gs: 82, vs: -200, bank: 0 },
+  // Pattern entry — downwind (TPA at KYIP = 1716)
+  { t: 210, lat:42.2500, lon:-83.5300, alt:1716, ias: 90, hdg:270, gs: 78, vs:    0, bank:15 },
+  // Base
+  { t: 225, lat:42.2350, lon:-83.5450, alt:1400, ias: 80, hdg:180, gs: 70, vs: -400, bank:20 },
+  // Final
+  { t: 240, lat:42.2350, lon:-83.5350, alt:1000, ias: 75, hdg: 90, gs: 65, vs: -400, bank: 0 },
+  // Landing
+  { t: 255, lat:42.2379, lon:-83.5304, alt: 716, ias:  0, hdg: 90, gs:  0, vs:    0, bank: 0 }
+];
+
+function demoTick() {
+  const elapsed = (Date.now() - state.demoStart) / 1000;
+
+  // Find surrounding waypoints
+  let i = 0;
+  for (i = 0; i < DEMO_ROUTE.length - 1; i++) {
+    if (elapsed < DEMO_ROUTE[i+1].t) break;
+  }
+  if (i >= DEMO_ROUTE.length - 1) {
+    // Landed. Loop or stop?
+    const last = DEMO_ROUTE[DEMO_ROUTE.length - 1];
+    state.ahrs.lat = last.lat; state.ahrs.lon = last.lon;
+    state.ahrs.altMSL = last.alt; state.ahrs.ias = 0;
+    state.ahrs.hdg = last.hdg; state.ahrs.gsKts = 0; state.ahrs.vsFpm = 0; state.ahrs.bank = 0;
+    if (!state.said.has('demo_done')) {
+      state.said.add('demo_done');
+      speak(`Demo complete. Safe on the ground at Willow Run.`);
+    }
+    return;
+  }
+
+  const a = DEMO_ROUTE[i];
+  const b = DEMO_ROUTE[i+1];
+  const p = (elapsed - a.t) / (b.t - a.t);
+  const lerp = (x, y) => x + (y - x) * p;
+
+  state.ahrs.lat    = lerp(a.lat, b.lat);
+  state.ahrs.lon    = lerp(a.lon, b.lon);
+  state.ahrs.altMSL = lerp(a.alt, b.alt);
+  state.ahrs.ias    = lerp(a.ias, b.ias);
+  state.ahrs.hdg    = lerp(a.hdg, b.hdg);
+  state.ahrs.gsKts  = lerp(a.gs,  b.gs);
+  state.ahrs.vsFpm  = lerp(a.vs,  b.vs);
+  state.ahrs.bank   = lerp(a.bank || 0, b.bank || 0);
+}
+
+function startDemo() {
+  state.demoMode = true;
+  state.demoStart = Date.now();
+  state.fuelStart = Date.now();
+  state.said.clear();
+  state.calloutLog = [];
+  // Auto-set destination to KYIP so distance callouts fire during demo
+  const kyip = AIRPORTS.find(a => a.id === 'KYIP');
+  setDestination(kyip);
+  $('statusDot').className = 'status-dot demo';
+  $('statusText').textContent = 'DEMO FLIGHT';
+  speak(`Demo starting. Route KPTK to KYIP. Watch for the Detroit Class B warning enroute.`);
+  showCockpit();
+}
+
+/* ============================================================
+   STRATUX CONNECTION
+   ============================================================ */
+function connectStratux(ip) {
+  const url = `ws://${ip}/situation`;
+  try {
+    state.ws = new WebSocket(url);
+    state.ws.onopen = () => {
+      state.connected = true;
+      $('statusDot').className = 'status-dot on';
+      $('statusText').textContent = 'STRATUX LIVE';
+      speak(`Stratux connected. Good flight.`);
+    };
+    state.ws.onmessage = (evt) => {
+      try {
+        const s = JSON.parse(evt.data);
+        // Stratux fields: GPSLatitude, GPSLongitude, GPSAltitudeMSL, GPSGroundSpeed, GPSTrueCourse,
+        // AHRSGyroHeading, AHRSVerticalSpeed, AHRSPitch, AHRSRoll, BaroAltitude, BaroVerticalSpeed
+        if (typeof s.GPSLatitude === 'number') state.ahrs.lat = s.GPSLatitude;
+        if (typeof s.GPSLongitude === 'number') state.ahrs.lon = s.GPSLongitude;
+        if (typeof s.BaroAltitude === 'number') state.ahrs.altMSL = s.BaroAltitude;
+        else if (typeof s.GPSAltitudeMSL === 'number') state.ahrs.altMSL = s.GPSAltitudeMSL;
+        if (typeof s.GPSGroundSpeed === 'number') state.ahrs.gsKts = s.GPSGroundSpeed;
+        if (typeof s.GPSTrueCourse === 'number') state.ahrs.trk = s.GPSTrueCourse;
+        if (typeof s.AHRSGyroHeading === 'number') state.ahrs.hdg = s.AHRSGyroHeading;
+        else if (typeof s.GPSTrueCourse === 'number') state.ahrs.hdg = s.GPSTrueCourse;
+        if (typeof s.BaroVerticalSpeed === 'number') state.ahrs.vsFpm = s.BaroVerticalSpeed;
+        else if (typeof s.AHRSVerticalSpeed === 'number') state.ahrs.vsFpm = s.AHRSVerticalSpeed;
+        if (typeof s.AHRSRoll === 'number') state.ahrs.bank = s.AHRSRoll;
+        if (typeof s.AHRSPitch === 'number') state.ahrs.pitch = s.AHRSPitch;
+        // IAS not available from Stratux; approximate with GS at sea level
+        state.ahrs.ias = ktsToMph(state.ahrs.gsKts);
+      } catch(e) { /* ignore parse errors */ }
+    };
+    state.ws.onerror = (e) => {
+      $('statusDot').className = 'status-dot';
+      $('statusText').textContent = 'NO STRATUX';
+    };
+    state.ws.onclose = () => {
+      state.connected = false;
+      $('statusDot').className = 'status-dot';
+      $('statusText').textContent = 'DISCONNECTED';
+      // Auto-retry
+      clearTimeout(state.wsRetry);
+      state.wsRetry = setTimeout(() => connectStratux(ip), 5000);
+    };
+  } catch(e) {
+    $('statusText').textContent = 'CONNECT FAILED';
+  }
+}
+
+/* ============================================================
+   UI EVENT HANDLERS
+   ============================================================ */
+function showCockpit() {
+  $('setup').classList.remove('active');
+  $('cockpit').classList.add('active');
+  if (!state.tickInterval) state.tickInterval = setInterval(tick, 1000);
+}
+
+function populateAirportSelect() {
+  const sel = $('destSetup');
+  for (const a of AIRPORTS) {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = `${a.id} — ${a.name}`;
+    sel.appendChild(opt);
+  }
+}
+function populateVoicePicker() {
+  const sel = $('voicePicker');
+  if (!sel) return;
+  // Preserve current selection when voices reload
+  const current = sel.value || VoiceEngine.userPref || '';
+  sel.innerHTML = '<option value="">Auto (best available)</option>';
+  // Group: enhanced/premium first, then everything else
+  const enhanced = VoiceEngine.available.filter(v => /Enhanced|Premium|Neural/i.test(v.name));
+  const standard = VoiceEngine.available.filter(v => !/Enhanced|Premium|Neural/i.test(v.name));
+  const addOpt = (v, label) => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = label || `${v.name} (${v.lang})`;
+    if (v.name === current) opt.selected = true;
+    sel.appendChild(opt);
+  };
+  if (enhanced.length) {
+    const g1 = document.createElement('optgroup'); g1.label = '★ Natural voices';
+    sel.appendChild(g1);
+    enhanced.forEach(v => addOpt(v, `★ ${v.name}`));
+  }
+  if (standard.length) {
+    const g2 = document.createElement('optgroup'); g2.label = 'Standard voices';
+    sel.appendChild(g2);
+    standard.forEach(v => addOpt(v));
+  }
+}
+// Track the last online lookup so we can display it as a result
+let onlineLookupResult = null;
+let onlineLookupInFlight = false;
+
+function populateDestList(filter = '') {
+  const list = $('destList');
+  const raw = filter.trim();
+  const f = raw.toLowerCase();
+
+  // Filter curated + any previously loaded online airports
+  const curated = AIRPORTS.filter(a =>
+    a.id.toLowerCase().includes(f) || a.name.toLowerCase().includes(f)
+  );
+
+  // Also surface any recent online result if it matches
+  const online = (onlineLookupResult && !curated.find(a => a.id === onlineLookupResult.id))
+    ? [onlineLookupResult] : [];
+
+  const combined = [...online, ...curated];
+
+  const rows = combined.map(a => `
+    <div class="callout info" data-apt="${a.id}" style="cursor:pointer; margin-bottom: 8px;">
+      <div style="font-weight:700; font-size:16px; display:flex; justify-content:space-between;">
+        <span>${a.id}</span>
+        ${online.length && a === online[0] ? '<span style="font-size:10px;color:var(--data);letter-spacing:1px;">FROM ONLINE DB</span>' : ''}
+      </div>
+      <div style="color:var(--text-dim); font-size:12px;">${a.name}${a.city ? ` — ${a.city}` : ''}</div>
+      <div style="color:var(--muted); font-size:11px; margin-top:2px;">
+        Elev ${a.elev}′ · TPA ${a.pattern}′ · CTAF ${a.ctaf.toFixed(2)}
+      </div>
+    </div>
+  `).join('');
+
+  // Show a "Look up online" button if:
+  //  - user typed something that looks like an airport code (3-5 chars alphanumeric)
+  //  - no curated match exists for that exact ID
+  const looksLikeCode = /^[a-z0-9]{3,5}$/i.test(raw);
+  const alreadyExact  = combined.find(a => a.id.toUpperCase() === raw.toUpperCase() || a.id.toUpperCase() === 'K' + raw.toUpperCase());
+  let lookupBtn = '';
+  if (looksLikeCode && !alreadyExact) {
+    if (onlineLookupInFlight) {
+      lookupBtn = `<div class="callout caution" style="margin-bottom:8px;">
+        <div style="font-weight:600;">Looking up ${raw.toUpperCase()}…</div>
+        <div id="lookupStatus" style="color:var(--text-dim); font-size:11px; margin-top:2px;">Fetching airport database (first time only)</div>
+      </div>`;
+    } else {
+      lookupBtn = `<div class="callout info" id="lookupBtn" style="cursor:pointer; margin-bottom:8px; border-left-color:var(--data);">
+        <div style="font-weight:700; color:var(--data);">🔎 Look up "${raw.toUpperCase()}" online</div>
+        <div style="color:var(--muted); font-size:11px; margin-top:2px;">Searches the full US airport database</div>
+      </div>`;
+    }
+  }
+
+  const emptyMsg = (combined.length === 0 && !lookupBtn)
+    ? '<div class="airspace-empty" style="padding:20px;">No matches. Type an airport ID (e.g. KABC) and I\'ll look it up.</div>'
+    : '';
+
+  list.innerHTML = lookupBtn + rows + emptyMsg;
+
+  list.querySelectorAll('[data-apt]').forEach(el => {
+    el.onclick = () => {
+      const apt = combined.find(x => x.id === el.dataset.apt);
+      if (apt) {
+        setDestination(apt);
+        closeModal('destModal');
+      }
+    };
+  });
+  const lb = $('lookupBtn');
+  if (lb) lb.onclick = () => triggerOnlineLookup(raw);
+}
+
+async function triggerOnlineLookup(query) {
+  onlineLookupInFlight = true;
+  AirportDB.onProgress = (msg) => {
+    const el = $('lookupStatus');
+    if (el) el.textContent = msg;
+  };
+  populateDestList($('destSearch').value);
+  try {
+    const result = await AirportDB.lookup(query);
+    if (result) {
+      onlineLookupResult = result;
+    } else {
+      onlineLookupResult = null;
+      Callouts && logCallout(`No airport found for "${query.toUpperCase()}".`, 'caution');
+    }
+  } catch (e) {
+    onlineLookupResult = null;
+    logCallout(`Airport lookup failed: ${e.message}. Are you online?`, 'warn');
+  } finally {
+    onlineLookupInFlight = false;
+    AirportDB.onProgress = null;
+    populateDestList($('destSearch').value);
+  }
+}
+
+function openModal(id) { $(id).classList.add('active'); }
+function closeModal(id) { $(id).classList.remove('active'); }
+window.closeModal = closeModal;
+
+function showMicPermissionModal(reason) {
+  const reasonText = {
+    'NotAllowedError': "Microphone access is currently blocked. You'll need to allow it in Settings.",
+    'not-allowed':      "Microphone access is currently blocked. You'll need to allow it in Settings.",
+    'service-not-allowed': "Speech recognition is blocked. Check your Safari privacy settings.",
+    'NotFoundError':    "No microphone found on this device.",
+    'no-api':           "This browser doesn't support the microphone API. Use Safari on iOS.",
+    'unknown':          "Something went wrong requesting the microphone."
+  }[reason] || "Microphone couldn't be accessed. You'll need to allow it in Settings.";
+  $('micReasonText').textContent = reasonText;
+  openModal('micModal');
+}
+window.tryMicAgain = async () => {
+  closeModal('micModal');
+  const result = await Listener.start();
+  if (!result.started) {
+    // If it fails again, re-open the help
+    if (result.reason === 'NotAllowedError' || result.reason === 'not-allowed') {
+      showMicPermissionModal(result.reason);
+    }
+  }
+};
+
+function populatePohQuick() {
+  const q = $('pohQuick');
+  const topics = ['Engine failure', 'Carb heat', 'Fuel', 'Stall', 'Landing', 'Takeoff', 'Cruise', 'Flaps', 'Electrical'];
+  q.innerHTML = topics.map(t => `<div class="poh-quick-btn" data-q="${t.toLowerCase()}">${t}</div>`).join('');
+  q.querySelectorAll('[data-q]').forEach(el => {
+    el.onclick = () => {
+      $('pohSearch').value = el.dataset.q;
+      answerPoh(el.dataset.q);
+    };
+  });
+}
+function answerPoh(query, { spoken = false } = {}) {
+  const q = query.toLowerCase();
+  // Score each entry by keyword overlap
+  let best = null, bestScore = 0;
+  for (const entry of POH_KB) {
+    const keys = entry.q.split(' ');
+    let score = 0;
+    for (const k of keys) { if (k.length > 2 && q.includes(k)) score++; }
+    if (score > bestScore) { bestScore = score; best = entry; }
+  }
+  if (best && bestScore > 0) {
+    $('pohAnswer').textContent = best.a;
+    if (spoken) speak(best.spoken || best.a);
+  } else {
+    $('pohAnswer').textContent = 'No match. Try: engine failure, carb heat, fuel, weight balance, stall, takeoff, landing, cruise, electrical, flaps, V-speeds.';
+    if (spoken) speak("I didn't find that one. Try engine failure, carb heat, fuel, stall, or V-speeds.");
+  }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('load', () => {
+  populateAirportSelect();
+
+  // Voice + mic setup
+  VoiceEngine.loadPreference();
+  VoiceEngine.init();
+  window.onVoicesReady = () => populateVoicePicker();
+
+  const micBtn = $('micBtn');
+  const micLabel = $('micLabel');
+  const micStatus = $('micStatus');
+
+  // Diagnose environment. On iOS, Safari requires a secure context (https
+  // or the home-screen web-app shell) for mic access. If we're on file://
+  // or plain http, getUserMedia is a no-op and the mic just won't work —
+  // we should say so instead of failing silently.
+  const isSecure = window.isSecureContext ||
+                   location.protocol === 'https:' ||
+                   location.hostname === 'localhost';
+  const hasSpeechRec = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const hasMediaAPI  = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+  if (hasSpeechRec && hasMediaAPI && isSecure) {
+    Listener.init((transcript) => {
+      $('pohSearch').value = transcript;
+      micStatus.textContent = `"${transcript}"`;
+      answerPoh(transcript, { spoken: true });
+    });
+    Listener.onInterim = (text) => {
+      micStatus.textContent = text;
+    };
+    Listener.onStateChange = (live, error) => {
+      if (live) {
+        micBtn.classList.add('live');
+        micLabel.textContent = 'Listening';
+        micStatus.classList.add('active');
+        micStatus.textContent = 'Speak now — I\'m listening';
+      } else {
+        micBtn.classList.remove('live');
+        micLabel.textContent = 'Voice';
+        if (error && error !== 'no-speech' && error !== 'aborted') {
+          micStatus.textContent = `Mic error: ${error}`;
+        }
+      }
+    };
+
+    Listener.onPermissionDenied = (reason) => {
+      micBtn.classList.remove('live');
+      micLabel.textContent = 'Voice';
+      showMicPermissionModal(reason);
+    };
+
+    micBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (Listener.listening) { Listener.stop(); return; }
+      micStatus.classList.add('active');
+      micStatus.textContent = 'Requesting mic…';
+      try {
+        const result = await Listener.start();
+        if (!result.started && result.reason) {
+          micStatus.textContent = `Mic unavailable: ${result.reason}`;
+        }
+      } catch (err) {
+        micStatus.textContent = `Mic error: ${err.message || err}`;
+      }
+    });
+  } else {
+    // Voice not available — explain why and hide the mic button
+    micBtn.style.display = 'none';
+    const reason = !isSecure
+      ? 'Voice needs the app served over HTTPS or added to your Home Screen. Typing works fine.'
+      : !hasSpeechRec
+      ? 'This browser doesn\'t support voice recognition. Type your question instead.'
+      : 'Microphone API not available. Type your question instead.';
+    // Show hint under the text field once when the modal opens
+    Listener.voiceUnavailableReason = reason;
+  }
+
+  // Enter in the text field: speak the answer
+  $('pohSearch').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      answerPoh(e.target.value, { spoken: true });
+      e.target.blur(); // dismiss iOS keyboard
+    }
+  });
+
+  // Restore prefs
+  try {
+    const saved = JSON.parse(localStorage.getItem('cherokee_prefs') || '{}');
+    if (saved.tail)          $('tail').value = saved.tail;
+    if (saved.units)         $('units').value = saved.units;
+    if (saved.fuelInterval)  $('fuelInterval').value = saved.fuelInterval;
+    if (saved.stratuxIp)     $('stratuxIp').value = saved.stratuxIp;
+  } catch(e){}
+
+  const savePrefs = () => {
+    localStorage.setItem('cherokee_prefs', JSON.stringify({
+      tail: $('tail').value,
+      units: $('units').value,
+      fuelInterval: $('fuelInterval').value,
+      stratuxIp: $('stratuxIp').value
+    }));
+  };
+
+  $('startLive').onclick = () => {
+    state.tail = $('tail').value;
+    state.units = $('units').value;
+    state.fuelInterval = parseInt($('fuelInterval').value, 10) || 30;
+    savePrefs();
+    speak('CoPilot online.');
+    const destId = $('destSetup').value;
+    if (destId) setDestination(AIRPORTS.find(a => a.id === destId));
+    connectStratux($('stratuxIp').value);
+    showCockpit();
+  };
+
+  $('startDemo').onclick = () => {
+    state.units = $('units').value;
+    state.fuelInterval = parseInt($('fuelInterval').value, 10) || 30;
+    savePrefs();
+    startDemo();
+  };
+
+  $('switchTankBtn').onclick = switchTank;
+  $('resetTimerBtn').onclick = () => {
+    state.fuelStart = Date.now();
+    state.said.delete('fuel_over');
+    state.said.delete('fuel_5');
+  };
+
+  $('destBtn').onclick = () => {
+    populateDestList('');
+    openModal('destModal');
+  };
+  $('destSearch').oninput = (e) => populateDestList(e.target.value);
+
+  $('pohBtn').onclick = () => {
+    populatePohQuick();
+    openModal('pohModal');
+    if (Listener.voiceUnavailableReason) {
+      $('micStatus').classList.add('active');
+      $('micStatus').textContent = Listener.voiceUnavailableReason;
+    }
+    // Give iOS a moment to render the modal, then focus the text field
+    setTimeout(() => { $('pohSearch').focus(); }, 100);
+  };
+  $('pohSearch').oninput = (e) => answerPoh(e.target.value);
+  // Also speak the answer when a quick-topic button is tapped
+  $('pohQuick').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-q]');
+    if (btn) answerPoh(btn.dataset.q, { spoken: true });
+  });
+
+  $('voicePicker').addEventListener('change', (e) => {
+    VoiceEngine.setPreference(e.target.value);
+    speak('Voice check. This is how the callouts will sound.');
+  });
+
+  $('quitBtn').onclick = () => {
+    if (state.ws) state.ws.close();
+    clearInterval(state.tickInterval);
+    state.tickInterval = null;
+    state.demoMode = false;
+    $('cockpit').classList.remove('active');
+    $('setup').classList.add('active');
+  };
+});
+</script>
+</body>
+</html>
